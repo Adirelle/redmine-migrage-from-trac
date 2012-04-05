@@ -275,31 +275,36 @@ namespace :redmine do
         # Titles
         text = text.gsub(/^(\=+)\s(.+)\s(\=+)/) {|s| "\nh#{$1.length}. #{$2}\n"}
         # External Links
-        text = text.gsub(/\[(http[^\s]+)\s+([^\]]+)\]/) {|s| "\"#{$2}\":#{$1}"}
+        text = text.gsub(/\[(http\S+)\s+(.+?)\]/, '"\2":\1')
         # Ticket links:
         #      [ticket:234 Text],[ticket:234 This is a test]
-        text = text.gsub(/\[ticket\:([^\ ]+)\ (.+?)\]/, '"\2":/issues/show/\1')
+        text = text.gsub(/\[ticket:(\d+)\s+(.+?)\]/, '"\2":/issues/show/\1')
         #      ticket:1234
         #      #1 is working cause Redmine uses the same syntax.
-        text = text.gsub(/ticket\:([^\ ]+)/, '#\1')
+        text = text.gsub(/ticket:(\d+)/, '#\1')
         # Milestone links:
         #      [milestone:"0.1.0 Mercury" Milestone 0.1.0 (Mercury)]
         #      The text "Milestone 0.1.0 (Mercury)" is not converted,
         #      cause Redmine's wiki does not support this.
-        text = text.gsub(/\[milestone\:\"([^\"]+)\"\ (.+?)\]/, 'version:"\1"')
+        text = text.gsub(/\[milestone:"(.+?)"\s+(.+?)\]/, 'version:"\1"')
         #      [milestone:"0.1.0 Mercury"]
-        text = text.gsub(/\[milestone\:\"([^\"]+)\"\]/, 'version:"\1"')
-        text = text.gsub(/milestone\:\"([^\"]+)\"/, 'version:"\1"')
+        text = text.gsub(/\[milestone:"(.+?)"\]/, 'version:"\1"')
+        #      [milestone:0.1.0]
+        text = text.gsub(/\[milestone:(\S+)\]/, 'version:\1')
+        #      milestone:"0.1.0 Mercury"
+        text = text.gsub(/milestone:"(.+?)"/, 'version:"\1"')
         #      milestone:0.1.0
-        text = text.gsub(/\[milestone\:([^\ ]+)\]/, 'version:\1')
-        text = text.gsub(/milestone\:([^\ ]+)/, 'version:\1')
+        text = text.gsub(/milestone:(\S+)/, 'version:\1')
         # Internal Links
         text = text.gsub(/\[\[BR\]\]/, "\n") # This has to go before the rules below
-        text = text.gsub(/\[\"(.+)\".*\]/) {|s| "[[#{$1.delete(',./?;|:')}]]"}
-        text = text.gsub(/\[wiki:\"(.+)\".*\]/) {|s| "[[#{$1.delete(',./?;|:')}]]"}
-        text = text.gsub(/\[wiki:\"(.+)\".*\]/) {|s| "[[#{$1.delete(',./?;|:')}]]"}
-        text = text.gsub(/\[wiki:([^\s\]]+)\]/) {|s| "[[#{$1.delete(',./?;|:')}]]"}
-        text = text.gsub(/\[wiki:([^\s\]]+)\s(.*)\]/) {|s| "[[#{$1.delete(',./?;|:')}|#{$2.delete(',./?;|:')}]]"}
+        #      ["Some page"]
+        text = text.gsub(/\[\"(.+)\"\]/) {|s| "[[#{$1.delete(',./?;|:')}]]"}
+        #      [wiki:"Some page"]
+        text = text.gsub(/\[wiki:\"(.+)\"\]/) {|s| "[[#{$1.delete(',./?;|:')}]]"}
+        #      [wiki:SomePage Some text]
+        text = text.gsub(/\[wiki:(\w+)\s+(.+)\]/) {|s| "[[#{$1}|#{$2.delete(',./?;|:')}]]"}
+        #      wiki:CamelCase
+        text = text.gsub(/wiki:([A-Z][a-z]+[A-Z][a-zA-Z]+)/, '[[\1]]')
 
         # Links to pages UsingJustWikiCaps
         text = text.gsub(/([^!]|^)(^| )([A-Z][a-z]+[A-Z][a-zA-Z]+)/, '\\1\\2[[\3]]')
@@ -307,7 +312,10 @@ namespace :redmine do
         # like !NotALink
         text = text.gsub(/(^| )!([A-Z][A-Za-z]+)/, '\1\2')
         # Revisions links
+        #      [15]
         text = text.gsub(/\[(\d+)\]/, 'r\1')
+        #      changeset:15
+        text = text.gsub(/changeset:(\d+)/, 'r\1')
         # Ticket number re-writing
         text = text.gsub(/#(\d+)/) do |s|
           if $1.length < 10
