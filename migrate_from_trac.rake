@@ -198,6 +198,7 @@ namespace :redmine do
                            TracReports TracRevisionLog TracRoadmap TracRss TracSearch TracStandalone TracSupport TracSyntaxColoring TracTickets \
                            TracTicketsCustomFields TracTimeline TracUnicode TracUpgrade TracWiki WikiDeletePage WikiFormatting \
                            WikiHtml WikiMacros WikiNewPage WikiPageNames WikiProcessors WikiRestructuredText WikiRestructuredTextLinks \
+                           PageTemplates TracFineGrainedPermissions TracNavigation TracWorkflow \
                            CamelCase TitleIndex)
 
       class TracWikiPage < ActiveRecord::Base
