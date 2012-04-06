@@ -278,6 +278,8 @@ namespace :redmine do
 
       # Basic wiki syntax conversion
       def self.convert_wiki_text(text)
+        # Encode it
+        text = encode(text)
         # Titles
         text = text.gsub(/^(\=+)\s(.+)\s(\=+)/) {|s| "\nh#{$1.length}. #{$2}\n"}
         # External Links
@@ -510,7 +512,7 @@ namespace :redmine do
           STDOUT.flush
           i = Issue.new :project => @target_project,
                           :subject => encode(ticket.summary[0, limit_for(Issue, 'subject')]),
-                          :description => convert_wiki_text(encode(ticket.description)),
+                          :description => convert_wiki_text(ticket.description),
                           :priority => PRIORITY_MAPPING[ticket.priority] || DEFAULT_PRIORITY,
                           :created_on => ticket.time
           i.author = find_or_create_user(ticket.reporter)
@@ -535,7 +537,7 @@ namespace :redmine do
             resolution_change = changeset.select {|change| change.field == 'resolution'}.first
             comment_change = changeset.select {|change| change.field == 'comment'}.first
 
-            n = Journal.new :notes => (comment_change ? convert_wiki_text(encode(comment_change.newvalue)) : ''),
+            n = Journal.new :notes => (comment_change ? convert_wiki_text(comment_change.newvalue) : ''),
                             :created_on => time
             n.user = find_or_create_user(changeset.first.author)
             n.journalized = i
