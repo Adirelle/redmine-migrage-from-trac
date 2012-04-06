@@ -372,6 +372,28 @@ namespace :redmine do
         text
       end
 
+      def self.sanitize_attachment_filename(filename)
+        filename.gsub(/^.*(\\|\/)/, '').gsub(/[^\w\.\-]/,'_')
+      end
+
+      def self.migrate_attachments(tracContainer, container)
+        count = 0
+        tracContainer.attachments.each do |attachment|
+          next if attachment.nil?
+          mangled_filename = sanitize_attachment_filename(attachment.filename)
+          next if container.attachments.find_by_filename(mangled_filename)
+          attachment.open {
+            a = Attachment.new :created_on => attachment.time
+            a.file = attachment
+            a.author = find_or_create_user(attachment.author)
+            a.description = attachment.description
+            a.container = container
+            count += 1 if a.save
+          }
+        end
+        count
+      end
+
       def self.migrate
         establish_connection
 
@@ -520,17 +542,7 @@ namespace :redmine do
           end
 
           # Attachments
-          ticket.attachments.each do |attachment|
-            next unless attachment.exist?
-            attachment.open {
-              a = Attachment.new :created_on => attachment.time
-              a.file = attachment
-              a.author = find_or_create_user(attachment.author)
-              a.container = i
-              a.description = attachment.description
-              migrated_ticket_attachments += 1 if a.save
-            }
-          end
+          migrated_ticket_attachments += migrate_attachments(ticket, i)
 
           # Custom fields
           custom_values = ticket.customs.inject({}) do |h, custom|
@@ -571,18 +583,7 @@ namespace :redmine do
             migrated_wiki_edits += 1
 
             # Attachments
-            page.attachments.each do |attachment|
-              next unless attachment.exist?
-              next if p.attachments.find_by_filename(attachment.filename.gsub(/^.*(\\|\/)/, '').gsub(/[^\w\.\-]/,'_')) #add only once per page
-              attachment.open {
-                a = Attachment.new :created_on => attachment.time
-                a.file = attachment
-                a.author = find_or_create_user(attachment.author)
-                a.description = attachment.description
-                a.container = p
-                migrated_wiki_attachments += 1 if a.save
-              }
-            end
+            migrated_wiki_attachments += migrate_attachments(page, p)
           end
 
           wiki.reload
