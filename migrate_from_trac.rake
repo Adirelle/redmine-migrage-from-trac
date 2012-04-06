@@ -21,7 +21,7 @@ require 'pp'
 
 namespace :redmine do
   desc 'Trac migration script'
-  task :migrate_from_trac => :environment do
+  task :migrate_from_trac, [:directory, :adapter, :project_id, :encoding, :db_host, :db_port, :db_name, :db_schema, :db_username, :db_password] => :environment do |t, args|
 
     module TracMigrate
         TICKET_MAP = []
@@ -732,31 +732,40 @@ namespace :redmine do
     break unless STDIN.gets.match(/^y$/i)
     puts
 
-    def prompt(text, options = {}, &block)
+    def prompt(text, args, options = {}, &block)
+      key = options[:key]
       default = options[:default] || ''
-      while true
-        print "#{text} [#{default}]: "
+      if key
+      arg = args[key]
+      if arg && yield(arg)
+        print "#{text}: #{arg}\n"
         STDOUT.flush
-        value = STDIN.gets.chomp!
-        value = default if value.blank?
-        break if yield value
+        return
+      end
+      end
+      while true
+      print "#{text} [#{default}]: "
+      STDOUT.flush
+      value = STDIN.gets.chomp!
+      value = default if value.blank?
+      break if yield value
       end
     end
 
     DEFAULT_PORTS = {'mysql' => 3306, 'postgresql' => 5432}
 
-    prompt('Trac directory') {|directory| TracMigrate.set_trac_directory directory.strip}
-    prompt('Trac database adapter (sqlite, sqlite3, mysql, postgresql)', :default => 'sqlite') {|adapter| TracMigrate.set_trac_adapter adapter}
+    prompt('Trac directory', args, :key => :directory) {|directory| TracMigrate.set_trac_directory directory.strip}
+    prompt('Trac database adapter (sqlite, sqlite3, mysql, postgresql)', args, :default => 'sqlite', :key => :adapter) {|adapter| TracMigrate.set_trac_adapter adapter}
     unless %w(sqlite sqlite3).include?(TracMigrate.trac_adapter)
-      prompt('Trac database host', :default => 'localhost') {|host| TracMigrate.set_trac_db_host host}
-      prompt('Trac database port', :default => DEFAULT_PORTS[TracMigrate.trac_adapter]) {|port| TracMigrate.set_trac_db_port port}
-      prompt('Trac database name') {|name| TracMigrate.set_trac_db_name name}
-      prompt('Trac database schema', :default => 'public') {|schema| TracMigrate.set_trac_db_schema schema}
-      prompt('Trac database username') {|username| TracMigrate.set_trac_db_username username}
-      prompt('Trac database password') {|password| TracMigrate.set_trac_db_password password}
+      prompt('Trac database host', args, :default => 'localhost', :key => :db_host) {|host| TracMigrate.set_trac_db_host host}
+      prompt('Trac database port', args, :default => DEFAULT_PORTS[TracMigrate.trac_adapter], :key => :db_port) {|port| TracMigrate.set_trac_db_port port}
+      prompt('Trac database name', args, :key => :db_name) {|name| TracMigrate.set_trac_db_name name}
+      prompt('Trac database schema', args, :default => 'public', :key => :db_schema) {|schema| TracMigrate.set_trac_db_schema schema}
+      prompt('Trac database username', args, :key => :db_username) {|username| TracMigrate.set_trac_db_username username}
+      prompt('Trac database password', args, :key => :db_password) {|password| TracMigrate.set_trac_db_password password}
     end
-    prompt('Trac database encoding', :default => 'UTF-8') {|encoding| TracMigrate.encoding encoding}
-    prompt('Target project identifier') {|identifier| TracMigrate.target_project_identifier identifier}
+    prompt('Trac database encoding', args, :default => 'UTF-8', :key => :encoding) {|encoding| TracMigrate.encoding encoding}
+    prompt('Target project identifier', args, :key => :project_id) {|identifier| TracMigrate.target_project_identifier identifier}
     puts
 
     # Turn off email notifications
