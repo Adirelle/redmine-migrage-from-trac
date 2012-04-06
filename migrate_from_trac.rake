@@ -282,6 +282,11 @@ namespace :redmine do
         text = text.gsub(/^(\=+)\s(.+)\s(\=+)/) {|s| "\nh#{$1.length}. #{$2}\n"}
         # External Links
         text = text.gsub(/\[(http\S+)\s+(.+?)\]/, '"\2":\1')
+        # Attachments links
+        text = text.gsub(/attachment:(wiki|milestone|ticket):[^:]+:(\S+?)/, 'attachment:\2')
+        text = text.gsub(/\[attachment:(\S+)\s+(.*?)\]/) {|s| "#{$2}: attachment:#{sanitize_attachment_filename($1)}"}
+        text = text.gsub(/\[attachment:(.+?)\]/) {|s| "attachment:#{sanitize_attachment_filename($1)}"}
+        text = text.gsub(/attachment:(\S+)/) {|s| "attachment:#{sanitize_attachment_filename($1)}"}
         # Ticket links:
         #      [ticket:234 Text],[ticket:234 This is a test]
         text = text.gsub(/\[ticket:(\d+)\s+(.+?)\]/, '"\2":/issues/show/\1')
