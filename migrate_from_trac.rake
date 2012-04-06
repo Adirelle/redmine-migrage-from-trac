@@ -300,11 +300,11 @@ namespace :redmine do
         text = text.gsub(/\[wiki:([^\s\]]+)\]/) {|s| "[[#{$1.delete(',./?;|:')}]]"}
         text = text.gsub(/\[wiki:([^\s\]]+)\s(.*)\]/) {|s| "[[#{$1.delete(',./?;|:')}|#{$2.delete(',./?;|:')}]]"}
 
-  # Links to pages UsingJustWikiCaps
-  text = text.gsub(/([^!]|^)(^| )([A-Z][a-z]+[A-Z][a-zA-Z]+)/, '\\1\\2[[\3]]')
-  # Normalize things that were supposed to not be links
-  # like !NotALink
-  text = text.gsub(/(^| )!([A-Z][A-Za-z]+)/, '\1\2')
+        # Links to pages UsingJustWikiCaps
+        text = text.gsub(/([^!]|^)(^| )([A-Z][a-z]+[A-Z][a-zA-Z]+)/, '\\1\\2[[\3]]')
+        # Normalize things that were supposed to not be links
+        # like !NotALink
+        text = text.gsub(/(^| )!([A-Z][A-Za-z]+)/, '\1\2')
         # Revisions links
         text = text.gsub(/\[(\d+)\]/, 'r\1')
         # Ticket number re-writing
@@ -387,13 +387,13 @@ namespace :redmine do
         print "Migrating components"
         issues_category_map = {}
         TracComponent.find(:all).each do |component|
-        print '.'
-        STDOUT.flush
+          print '.'
+          STDOUT.flush
           c = IssueCategory.new :project => @target_project,
                                 :name => encode(component.name[0, limit_for(IssueCategory, 'name')])
-        next unless c.save
-        issues_category_map[component.name] = c
-        migrated_components += 1
+          next unless c.save
+          issues_category_map[component.name] = c
+          migrated_components += 1
         end
         puts
 
@@ -477,50 +477,50 @@ namespace :redmine do
           migrated_tickets += 1
 
           # Owner
-            unless ticket.owner.blank?
-              i.assigned_to = find_or_create_user(ticket.owner, true)
-              Time.fake(ticket.changetime) { i.save }
-            end
+          unless ticket.owner.blank?
+            i.assigned_to = find_or_create_user(ticket.owner, true)
+            Time.fake(ticket.changetime) { i.save }
+          end
 
           # Comments and status/resolution changes
           ticket.changes.group_by(&:time).each do |time, changeset|
-              status_change = changeset.select {|change| change.field == 'status'}.first
-              resolution_change = changeset.select {|change| change.field == 'resolution'}.first
-              comment_change = changeset.select {|change| change.field == 'comment'}.first
+            status_change = changeset.select {|change| change.field == 'status'}.first
+            resolution_change = changeset.select {|change| change.field == 'resolution'}.first
+            comment_change = changeset.select {|change| change.field == 'comment'}.first
 
-              n = Journal.new :notes => (comment_change ? convert_wiki_text(encode(comment_change.newvalue)) : ''),
-                              :created_on => time
-              n.user = find_or_create_user(changeset.first.author)
-              n.journalized = i
-              if status_change &&
-                   STATUS_MAPPING[status_change.oldvalue] &&
-                   STATUS_MAPPING[status_change.newvalue] &&
-                   (STATUS_MAPPING[status_change.oldvalue] != STATUS_MAPPING[status_change.newvalue])
-                n.details << JournalDetail.new(:property => 'attr',
-                                               :prop_key => 'status_id',
-                                               :old_value => STATUS_MAPPING[status_change.oldvalue].id,
-                                               :value => STATUS_MAPPING[status_change.newvalue].id)
-              end
-              if resolution_change
-                n.details << JournalDetail.new(:property => 'cf',
-                                               :prop_key => custom_field_map['resolution'].id,
-                                               :old_value => resolution_change.oldvalue,
-                                               :value => resolution_change.newvalue)
-              end
-              n.save unless n.details.empty? && n.notes.blank?
+            n = Journal.new :notes => (comment_change ? convert_wiki_text(encode(comment_change.newvalue)) : ''),
+                            :created_on => time
+            n.user = find_or_create_user(changeset.first.author)
+            n.journalized = i
+            if status_change &&
+                 STATUS_MAPPING[status_change.oldvalue] &&
+                 STATUS_MAPPING[status_change.newvalue] &&
+                 (STATUS_MAPPING[status_change.oldvalue] != STATUS_MAPPING[status_change.newvalue])
+              n.details << JournalDetail.new(:property => 'attr',
+                                             :prop_key => 'status_id',
+                                             :old_value => STATUS_MAPPING[status_change.oldvalue].id,
+                                             :value => STATUS_MAPPING[status_change.newvalue].id)
+            end
+            if resolution_change
+              n.details << JournalDetail.new(:property => 'cf',
+                                             :prop_key => custom_field_map['resolution'].id,
+                                             :old_value => resolution_change.oldvalue,
+                                             :value => resolution_change.newvalue)
+            end
+            n.save unless n.details.empty? && n.notes.blank?
           end
 
           # Attachments
           ticket.attachments.each do |attachment|
             next unless attachment.exist?
-              attachment.open {
-                a = Attachment.new :created_on => attachment.time
-                a.file = attachment
-                a.author = find_or_create_user(attachment.author)
-                a.container = i
-                a.description = attachment.description
-                migrated_ticket_attachments += 1 if a.save
-              }
+            attachment.open {
+              a = Attachment.new :created_on => attachment.time
+              a.file = attachment
+              a.author = find_or_create_user(attachment.author)
+              a.container = i
+              a.description = attachment.description
+              migrated_ticket_attachments += 1 if a.save
+            }
           end
 
           # Custom fields
@@ -765,4 +765,4 @@ namespace :redmine do
     TracMigrate.migrate
   end
 end
-
+# vi:expandtab:ts=2 sw=2
