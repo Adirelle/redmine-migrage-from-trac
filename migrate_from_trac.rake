@@ -309,6 +309,8 @@ namespace :redmine do
         text = text.gsub(/\[wiki:\"(.+?)\"\]/) {|s| "[[#{Wiki.titleize($1)}]]"}
         #      [wiki:SomePage Some text]
         text = text.gsub(/\[wiki:(\w+)\s+(.+?)\]/) {|s| "[[#{Wiki.titleize($1)}|#{$2}]]"}
+        #      [CamelCase Some text]
+        text = text.gsub(/\[([A-Z][a-z]+[A-Z][a-zA-Z]+)\s+(.+?)\]/) {|s| "[[#{Wiki.titleize($1)}|#{$2}]]"}
         #      wiki:CamelCase
         text = text.gsub(/wiki:([A-Z][a-z]+[A-Z][a-zA-Z]+)/, '[[\1]]')
 
