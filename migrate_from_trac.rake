@@ -139,7 +139,7 @@ namespace :redmine do
         has_many :attachments, :class_name => "TracAttachment",
                                :finder_sql => "SELECT DISTINCT attachment.* FROM #{TracMigrate::TracAttachment.table_name}" +
                                               " WHERE #{TracMigrate::TracAttachment.table_name}.type = 'milestone'" +
-                                              ' AND #{TracMigrate::TracAttachment.table_name}.id = \'#{TracMigrate::TracAttachment.connection.quote_string(id.to_s)}\''
+                                              ' AND #{TracMigrate::TracAttachment.table_name}.id = \'#{TracMigrate::TracAttachment.connection.quote_string(name.to_s)}\''
 
         # If this attribute is set a milestone has a defined target timepoint
         def due
