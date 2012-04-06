@@ -442,7 +442,8 @@ namespace :redmine do
           print '.'
           STDOUT.flush
           # First we try to find the wiki page...
-          p = wiki.find_or_new_page(milestone.name.to_s)
+          wiki_page_title = "Version" + Wiki.titleize(milestone.name.to_s)
+          p = wiki.find_or_new_page(wiki_page_title)
           p.content = WikiContent.new(:page => p) if p.new_record?
           p.content.text = milestone.description.to_s
           p.content.author = find_or_create_user('trac')
@@ -452,7 +453,7 @@ namespace :redmine do
           v = Version.new :project => @target_project,
                           :name => encode(milestone.name[0, limit_for(Version, 'name')]),
                           :description => nil,
-                          :wiki_page_title => milestone.name.to_s,
+                          :wiki_page_title => wiki_page_title,
                           :effective_date => milestone.completed
 
           next unless v.save
