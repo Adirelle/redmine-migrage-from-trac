@@ -88,31 +88,6 @@ namespace :redmine do
         set_table_name :component
       end
 
-      class TracMilestone < ActiveRecord::Base
-        set_table_name :milestone
-        # If this attribute is set a milestone has a defined target timepoint
-        def due
-          if read_attribute(:due) && read_attribute(:due) > 0
-            Time.at(read_attribute(:due)).to_date
-          else
-            nil
-          end
-        end
-        # This is the real timepoint at which the milestone has finished.
-        def completed
-          if read_attribute(:completed) && read_attribute(:completed) > 0
-            Time.at(read_attribute(:completed)).to_date
-          else
-            nil
-          end
-        end
-
-        def description
-          # Attribute is named descr in Trac v0.8.x
-          has_attribute?(:descr) ? read_attribute(:descr) : read_attribute(:description)
-        end
-      end
-
       class TracTicketCustom < ActiveRecord::Base
         set_table_name :ticket_custom
       end
@@ -155,6 +130,37 @@ namespace :redmine do
           attachment_type = read_attribute(:type)
           trac_file = filename.gsub( /[^a-zA-Z0-9\-_\.!~*']/n ) {|x| sprintf('%%%02x', x[0]) }
           "#{TracMigrate.trac_attachments_directory}/#{attachment_type}/#{id}/#{trac_file}"
+        end
+      end
+
+      class TracMilestone < ActiveRecord::Base
+        set_table_name :milestone
+
+        has_many :attachments, :class_name => "TracAttachment",
+                               :finder_sql => "SELECT DISTINCT attachment.* FROM #{TracMigrate::TracAttachment.table_name}" +
+                                              " WHERE #{TracMigrate::TracAttachment.table_name}.type = 'milestone'" +
+                                              ' AND #{TracMigrate::TracAttachment.table_name}.id = \'#{TracMigrate::TracAttachment.connection.quote_string(id.to_s)}\''
+
+        # If this attribute is set a milestone has a defined target timepoint
+        def due
+          if read_attribute(:due) && read_attribute(:due) > 0
+            Time.at(read_attribute(:due)).to_date
+          else
+            nil
+          end
+        end
+        # This is the real timepoint at which the milestone has finished.
+        def completed
+          if read_attribute(:completed) && read_attribute(:completed) > 0
+            Time.at(read_attribute(:completed)).to_date
+          else
+            nil
+          end
+        end
+
+        def description
+          # Attribute is named descr in Trac v0.8.x
+          has_attribute?(:descr) ? read_attribute(:descr) : read_attribute(:description)
         end
       end
 
@@ -402,6 +408,7 @@ namespace :redmine do
 
         migrated_components = 0
         migrated_milestones = 0
+        migrated_milestone_attachments = 0
         migrated_tickets = 0
         migrated_custom_values = 0
         migrated_ticket_attachments = 0
@@ -451,6 +458,7 @@ namespace :redmine do
           next unless v.save
           version_map[milestone.name] = v
           migrated_milestones += 1
+          migrated_milestone_attachments += migrate_attachments(milestone, v)
         end
         puts
 
@@ -597,6 +605,7 @@ namespace :redmine do
         puts
         puts "Components:      #{migrated_components}/#{TracComponent.count}"
         puts "Milestones:      #{migrated_milestones}/#{TracMilestone.count}"
+        puts "Milestone files: #{migrated_milestone_attachments}/" + TracAttachment.count(:conditions => {:type => 'milestone'}).to_s
         puts "Tickets:         #{migrated_tickets}/#{TracTicket.count}"
         puts "Ticket files:    #{migrated_ticket_attachments}/" + TracAttachment.count(:conditions => {:type => 'ticket'}).to_s
         puts "Custom values:   #{migrated_custom_values}/#{TracTicketCustom.count}"
