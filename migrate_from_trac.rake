@@ -298,11 +298,11 @@ namespace :redmine do
         # Internal Links
         text = text.gsub(/\[\[BR\]\]/, "\n") # This has to go before the rules below
         #      ["Some page"]
-        text = text.gsub(/\[\"(.+)\"\]/) {|s| "[[#{$1.delete(',./?;|:')}]]"}
+        text = text.gsub(/\[\"(.+)\"\]/) {|s| "[[#{Wiki.titleize($1)}]]"}
         #      [wiki:"Some page"]
-        text = text.gsub(/\[wiki:\"(.+)\"\]/) {|s| "[[#{$1.delete(',./?;|:')}]]"}
+        text = text.gsub(/\[wiki:\"(.+?)\"\]/) {|s| "[[#{Wiki.titleize($1)}]]"}
         #      [wiki:SomePage Some text]
-        text = text.gsub(/\[wiki:(\w+)\s+(.+)\]/) {|s| "[[#{$1}|#{$2.delete(',./?;|:')}]]"}
+        text = text.gsub(/\[wiki:(\w+)\s+(.+?)\]/) {|s| "[[#{Wiki.titleize($1)}|#{$2}]]"}
         #      wiki:CamelCase
         text = text.gsub(/wiki:([A-Z][a-z]+[A-Z][a-zA-Z]+)/, '[[\1]]')
 
