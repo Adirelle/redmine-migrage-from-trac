@@ -584,22 +584,21 @@ namespace :redmine do
         # Wiki
         print "Migrating wiki"
         if wiki.save
-          TracWikiPage.find(:all, :order => 'name, version').each do |page|
-            # Do not migrate Trac manual wiki pages
-            next if TRAC_WIKI_PAGES.include?(page.name)
-            wiki_edit_count += 1
+          TracWikiPage.all(:select => 'name, MAX(version) AS version',
+                           :conditions => [ 'name NOT IN (?)', TRAC_WIKI_PAGES ], # Do not migrate Trac manul wiki pages
+                           :group => 'name').each do |page|
             print '.'
             STDOUT.flush
+            wiki_edit_count += 1
             p = wiki.find_or_new_page(page.name)
-            p.content = WikiContent.new(:page => p) if p.new_record?
-            p.content.text = page.text
-            p.content.author = find_or_create_user(page.author) unless page.author.blank? || page.author == 'trac'
-            p.content.comments = page.comment
-            Time.fake(page.time) { p.new_record? ? p.save : p.content.save }
-
-            next if p.content.new_record?
-            migrated_wiki_edits += 1
-
+            TracWikiPage.all(:conditions => [ 'name = ?', page.name ], :order => 'version').each do |rev|
+              p.content = WikiContent.new(:page => p) if p.new_record?
+              p.content.text = rev.text
+              p.content.author = find_or_create_user(rev.author) unless rev.author.blank? || rev.author == 'trac'
+              p.content.comments = rev.comment
+              Time.fake(rev.time) { p.new_record? ? p.save : p.content.save }
+              migrated_wiki_edits += 1
+            end
             # Attachments
             migrated_wiki_attachments += migrate_attachments(page, p)
           end
