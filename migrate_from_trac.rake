@@ -434,6 +434,7 @@ namespace :redmine do
 
         #Wiki system initializing...
         @target_project.wiki.destroy if @target_project.wiki
+        @target_project.issues.destroy_all
         @target_project.reload
         wiki = Wiki.new(:project => @target_project, :start_page => 'WikiStart')
         wiki_edit_count = 0
