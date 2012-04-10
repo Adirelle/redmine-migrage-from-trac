@@ -286,14 +286,23 @@ namespace :redmine do
         text = text.gsub(/\{\{\{(?:\s*#!(\w+))?\s*(.*?)\s*\}\}\}/m) { |s| code_blocks << [$1, $2] ; '###CODE###' }
 
         # Titles
-        text = text.gsub(/^(\=+)\s(.+)\s(\=+)/) {|s| "\nh#{$1.length}. #{$2}\n"}
+        text = text.gsub(/^\s*(=+)\s(.+)\s(\=+)/) {|s| "\nh#{$1.length}. #{$2}\n"}
+
+        # [br] This has to go before the rules below
+        text = text.gsub(/\[\[BR\]\]/i, "\n")
+
         # External Links
-        text = text.gsub(/\[(http\S+)\s+(.+?)\]/, '"\2":\1')
+        #      [http://example.com/]
+        text = text.gsub(/\[((?:https?|s?ftp):\S+?)\]/, '\1')
+        #      [http://example.com/ Example] [http://example.com/ "Example"]
+        text = text.gsub(/\[((?:https?|s?ftp):\S+)\s+(['"]?)(.+?)\2\]/, '"$3":\1')
+        #      [mailto:some@example.com] [mailto:"some@example.com"]
+        text = text.gsub(/\[mailto:(['"]?)(\S+?)\1\]/, '\2')
         # Attachments links
-        text = text.gsub(/attachment:(wiki|milestone|ticket):[^:]+:(\S+?)/, 'attachment:\2')
-        text = text.gsub(/\[attachment:(\S+)\s+(.*?)\]/) {|s| "#{$2}: attachment:#{sanitize_attachment_filename($1)}"}
-        text = text.gsub(/\[attachment:(.+?)\]/) {|s| "attachment:#{sanitize_attachment_filename($1)}"}
-        text = text.gsub(/attachment:(\S+)/) {|s| "attachment:#{sanitize_attachment_filename($1)}"}
+        text = text.gsub(/(attachment|source):(wiki|milestone|ticket):[^:]+:(\S+?)/, '\1:\3')
+        text = text.gsub(/\[(attachment|source):(\S+)\s+(.*?)\]/) {|s| "#{$3}: #{$1}:#{sanitize_attachment_filename($2)}"}
+        text = text.gsub(/\[(attachment|source):(.+?)\]/) {|s| "#{$1}:#{sanitize_attachment_filename($2)}"}
+        text = text.gsub(/(attachment|source):(\S+)/) {|s| "${$1}:#{sanitize_attachment_filename($1)}"}
         # Ticket links:
         #      [ticket:234 Text],[ticket:234 This is a test]
         text = text.gsub(/\[ticket:(\d+)\s+(.+?)\]/, '"\2":/issues/show/\1')
@@ -304,21 +313,20 @@ namespace :redmine do
         #      [milestone:"0.1.0 Mercury" Milestone 0.1.0 (Mercury)]
         #      The text "Milestone 0.1.0 (Mercury)" is not converted,
         #      cause Redmine's wiki does not support this.
-        text = text.gsub(/\[milestone:"(.+?)"\s+(.+?)\]/, 'version:"\1"')
+        text = text.gsub(/\[milestone:(['"]?)(.+?)\1\s+(.+?)\]/, 'version:"\2"')
         #      [milestone:"0.1.0 Mercury"]
-        text = text.gsub(/\[milestone:"(.+?)"\]/, 'version:"\1"')
+        text = text.gsub(/\[milestone:(['"]?)(.+?)\1\]/, 'version:"\2"')
         #      [milestone:0.1.0]
         text = text.gsub(/\[milestone:(\S+)\]/, 'version:\1')
         #      milestone:"0.1.0 Mercury"
-        text = text.gsub(/milestone:"(.+?)"/, 'version:"\1"')
+        text = text.gsub(/milestone:(['"]?)(.+?)\1/, 'version:"\2"')
         #      milestone:0.1.0
         text = text.gsub(/milestone:(\S+)/, 'version:\1')
         # Internal Links
-        text = text.gsub(/\[\[BR\]\]/, "\n") # This has to go before the rules below
         #      ["Some page"]
-        text = text.gsub(/\[\"(.+)\"\]/) {|s| "[[#{Wiki.titleize($1)}]]"}
+        text = text.gsub(/\[(['"])(.+)\1\]/) {|s| "[[#{Wiki.titleize($2)}]]"}
         #      [wiki:"Some page"]
-        text = text.gsub(/\[wiki:\"(.+?)\"\]/) {|s| "[[#{Wiki.titleize($1)}]]"}
+        text = text.gsub(/\[wiki:(['"])(.+?)\1\]/) {|s| "[[#{Wiki.titleize($2)}]]"}
         #      [wiki:SomePage Some text]
         text = text.gsub(/\[wiki:(\w+)\s+(.+?)\]/) {|s| "[[#{Wiki.titleize($1)}|#{$2}]]"}
         #      [CamelCase Some text]
@@ -328,42 +336,50 @@ namespace :redmine do
 
         # Protect already converted links
         links = []
-        text = text.gsub(/\[\[.*?\]\]/) { |s| links << s ; '###LINK###' }
+        text = text.gsub(/\[\[.+?\]\]/) { |s| links << s; '###LINK###' }
 
-        # Links to pages UsingJustWikiCaps
-        text = text.gsub(/([^!]|^)(^| )([A-Z][a-z]+[A-Z][a-zA-Z]+)/, '\\1\\2[[\3]]')
-        # Normalize things that were supposed to not be links
-        # like !NotALink
-        text = text.gsub(/(^| )!([A-Z][A-Za-z]+)/, '\1\2')
+        # Protect !NotALink strings
+        not_a_links = []
+        text = text.gsub(/!([A-Z][A-Za-z]+)/) { |s| not_a_links << $1; '###NOTALINK###' }
+
+        # CamelCase Links
+        text = text.gsub(/\b([A-Z][a-z]+[A-Z][a-zA-Z]+)\b/, '[[\1]]')
+
         # Revisions links
         #      [15]
         text = text.gsub(/\[(\d+)\]/, 'r\1')
         #      changeset:15
         text = text.gsub(/changeset:(\d+)/, 'r\1')
-        # Ticket number re-writing
-        text = text.gsub(/#(\d+)/) do |s|
-          if $1.length < 10
-#            TICKET_MAP[$1.to_i] ||= $1
-            "\##{TICKET_MAP[$1.to_i] || $1}"
-          else
-            s
-          end
-        end
 
-        # Restore links
+        # Ticket number re-writing
+        text = text.gsub(/\#(\d{,9})/) { |s| "\##{TICKET_MAP[$1.to_i] || $1}" }
+
+        # Table
+        text = text.gsub(/\|\|/, '|')
+
+        # Restore protected strings
         text = text.gsub('###LINK###') { |s| links.shift }
+        text = text.gsub('###NOTALINK###') { |s| not_a_links.shift }
+
+        # Images
+        text = text.gsub(/\[\[image\((.+?)(?:,.+?)?\)\]\]/i, '!\1!')
+        # TOC
+        text = text.gsub(/\[\[TOC(?:\((.*?)\))?\]\]/m) {|s| "{{>toc}}\n"}
+        # Lists
+        #      bullets
+        text = text.gsub(/^([ \t]+)\*[ \t+]/m) {|s| '*' * $1.length + " " }
+        #      numbered
+        text = text.gsub(/^([ \t]+)\d+\.[ \t]/m) {|s| '#' * $1.length + " " }
 
         # Highlighting
-        text = text.gsub(/'''''([^\s])/, '_*\1')
-        text = text.gsub(/([^\s])'''''/, '\1*_')
+        text = text.gsub(/'''''(\S)/, '_*\1')
+        text = text.gsub(/(\S)'''''/, '\1*_')
         text = text.gsub(/'''/, '*')
         text = text.gsub(/''/, '_')
         text = text.gsub(/__/, '+')
         text = text.gsub(/~~/, '-')
         text = text.gsub(/`/, '@')
         text = text.gsub(/,,/, '~')
-        # Lists
-        text = text.gsub(/^([ ]+)\* /) {|s| '*' * $1.length + " "}
 
         # Restore and convert code blocks
         text = text.gsub('###CODE###') do |s|
