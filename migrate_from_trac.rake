@@ -306,7 +306,7 @@ namespace :redmine do
         text = text.gsub(/(attachment|source):(\S+)/) {|s| "${$1}:#{sanitize_attachment_filename($1)}"}
         # Ticket links:
         #      [ticket:234 Text],[ticket:234 This is a test]
-        text = text.gsub(/\[ticket:(\d+)\s+(.+?)\]/, '"\2":/issues/show/\1')
+        text = text.gsub(/\[ticket:(\d+)\s+(.+?)\]/) {|s| "\"#{$2}\":/issues/show/#{TICKET_MAP[$1.to_i] || $1}"}
         #      ticket:1234
         #      #1 is working cause Redmine uses the same syntax.
         text = text.gsub(/ticket:(\d+)/, '#\1')
@@ -353,7 +353,7 @@ namespace :redmine do
         text = text.gsub(/changeset:(\d+)/, 'r\1')
 
         # Ticket number re-writing
-        text = text.gsub(/\#(\d{,9})/) { |s| "\##{TICKET_MAP[$1.to_i] || $1}" }
+        text = text.gsub(/\#(\d{1,9})/) { |s| "\##{TICKET_MAP[$1.to_i] || $1}" }
 
         # Table
         text = text.gsub(/\|\|/, '|')
