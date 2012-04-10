@@ -280,6 +280,11 @@ namespace :redmine do
       def self.convert_wiki_text(text)
         # Encode it
         text = encode(text)
+
+        # Protect code blocks
+        code_blocks = []
+        text = text.gsub(/\{\{\{(?:\s*#!(\w+))?\s*(.*?)\s*\}\}\}/m) { |s| code_blocks << [$1, $2] ; '###CODE###' }
+
         # Titles
         text = text.gsub(/^(\=+)\s(.+)\s(\=+)/) {|s| "\nh#{$1.length}. #{$2}\n"}
         # External Links
@@ -348,38 +353,6 @@ namespace :redmine do
         # Restore links
         text = text.gsub('###LINK###') { |s| links.shift }
 
-        # We would like to convert the Code highlighting too
-        # This will go into the next line.
-        shebang_line = false
-        # Reguar expression for start of code
-        pre_re = /\{\{\{/
-        # Code hightlighing...
-        shebang_re = /^\#\!([a-z]+)/
-        # Regular expression for end of code
-        pre_end_re = /\}\}\}/
-
-        # Go through the whole text..extract it line by line
-        text = text.gsub(/^(.*)$/) do |line|
-          m_pre = pre_re.match(line)
-          if m_pre
-            line = '<pre>'
-          else
-            m_sl = shebang_re.match(line)
-            if m_sl
-              shebang_line = true
-              line = '<code class="' + m_sl[1] + '">'
-            end
-            m_pre_end = pre_end_re.match(line)
-            if m_pre_end
-              line = '</pre>'
-              if shebang_line
-                line = '</code>' + line
-              end
-            end
-          end
-          line
-        end
-
         # Highlighting
         text = text.gsub(/'''''([^\s])/, '_*\1')
         text = text.gsub(/([^\s])'''''/, '\1*_')
@@ -391,6 +364,16 @@ namespace :redmine do
         text = text.gsub(/,,/, '~')
         # Lists
         text = text.gsub(/^([ ]+)\* /) {|s| '*' * $1.length + " "}
+
+        # Restore and convert code blocks
+        text = text.gsub('###CODE###') do |s|
+          shebang, block = code_blocks.shift
+          if shebang
+            "<code class=\"#{shebang}\"><pre>#{block}</pre></code>"
+          else
+            "<pre>#{block}</pre>"
+          end
+        end
 
         text
       end
