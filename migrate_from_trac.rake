@@ -521,7 +521,7 @@ namespace :redmine do
           STDOUT.flush
           i = Issue.new :project => @target_project,
                           :subject => encode(ticket.summary[0, limit_for(Issue, 'subject')]),
-                          :description => convert_wiki_text(ticket.description),
+                          :description => ticket.description,
                           :priority => PRIORITY_MAPPING[ticket.priority] || DEFAULT_PRIORITY,
                           :created_on => ticket.time
           i.author = find_or_create_user(ticket.reporter)
@@ -546,7 +546,7 @@ namespace :redmine do
             resolution_change = changeset.select {|change| change.field == 'resolution'}.first
             comment_change = changeset.select {|change| change.field == 'comment'}.first
 
-            n = Journal.new :notes => (comment_change ? convert_wiki_text(comment_change.newvalue) : ''),
+            n = Journal.new :notes => (comment_change ? comment_change.newvalue : ''),
                             :created_on => time
             n.user = find_or_create_user(changeset.first.author)
             n.journalized = i
@@ -617,6 +617,22 @@ namespace :redmine do
             page.content.text = convert_wiki_text(page.content.text)
             Time.fake(page.content.updated_on) { page.content.save }
           end
+        end
+        puts
+
+        # Converting wiki texts
+        print "Converting remaining wiki texts"
+        @target_project.issues.each do |issue|
+          print '.'
+          STDOUT.flush
+          issue.description = convert_wiki_text(issue.description)
+          issue.journals.each do |journal|
+            print ':'
+            STDOUT.flush
+            journal.notes = convert_wiki_text(journal.notes)
+            journal.save
+          end
+          Time.fake(issue.updated_on) { issue.save }
         end
         puts
 
