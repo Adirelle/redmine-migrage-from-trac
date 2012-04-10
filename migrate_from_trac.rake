@@ -321,6 +321,10 @@ namespace :redmine do
         #      wiki:CamelCase
         text = text.gsub(/wiki:([A-Z][a-z]+[A-Z][a-zA-Z]+)/, '[[\1]]')
 
+        # Protect already converted links
+        links = []
+        text = text.gsub(/\[\[.*?\]\]/) { |s| links << s ; '###LINK###' }
+
         # Links to pages UsingJustWikiCaps
         text = text.gsub(/([^!]|^)(^| )([A-Z][a-z]+[A-Z][a-zA-Z]+)/, '\\1\\2[[\3]]')
         # Normalize things that were supposed to not be links
@@ -340,6 +344,10 @@ namespace :redmine do
             s
           end
         end
+
+        # Restore links
+        text = text.gsub('###LINK###') { |s| links.shift }
+
         # We would like to convert the Code highlighting too
         # This will go into the next line.
         shebang_line = false
