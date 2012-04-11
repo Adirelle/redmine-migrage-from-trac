@@ -634,6 +634,15 @@ namespace :redmine do
             committers << user if user
           end
 
+          puts "Converting commit logs"
+          rep.changesets.all.each do |c|
+            print "."
+            STDOUT.flush
+            c.comments = convert_wiki_text(c.comments)
+            c.save
+          end
+          puts
+
           @target_project.reload
         end
 
