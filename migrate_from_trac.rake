@@ -61,13 +61,7 @@ namespace :redmine do
                            'patch' =>TRACKER_FEATURE
                            }
 
-        roles = Role.find(:all, :conditions => {:builtin => 0}, :order => 'position ASC')
-        manager_role = roles[0]
-        developer_role = roles[1]
-        DEFAULT_ROLE = roles.last
-        ROLE_MAPPING = {'admin' => manager_role,
-                        'developer' => developer_role
-                        }
+        USER_BLACKLIST = %w(ED2I EDDI somebody)
 
       class ::Time
         class << self
@@ -233,8 +227,8 @@ namespace :redmine do
         set_table_name :session_attribute
       end
 
-      def self.find_or_create_user(username, project_member = false)
-        return User.anonymous if username.blank?
+      def self.find_or_create_user(username)
+        return User.anonymous if username.blank? || USER_BLACKLIST.include?(username)
 
         u = User.find_by_login(username)
         if !u
@@ -251,7 +245,7 @@ namespace :redmine do
           end
           name =~ (/(.*)(\s+\w+)?/)
           fn = $1.strip
-          ln = ($2 || '-').strip
+          ln = ($2 || '').strip
 
           u = User.new :mail => mail.gsub(/[^-@a-z0-9\.]/i, '-'),
                        :firstname => fn[0, limit_for(User, 'firstname')],
@@ -259,20 +253,8 @@ namespace :redmine do
 
           u.login = username[0,limit_for(User, 'login')].gsub(/[^a-z0-9_\-@\.]/i, '-')
           u.password = 'trac'
-          u.admin = true if TracPermission.find_by_username_and_action(username, 'admin')
           # finally, a default user is used if the new user is not valid
           u = User.find(:first) unless u.save
-        end
-        # Make sure he is a member of the project
-        if project_member && !u.member_of?(@target_project)
-          role = DEFAULT_ROLE
-          if u.admin
-            role = ROLE_MAPPING['admin']
-          elsif TracPermission.find_by_username_and_action(username, 'developer')
-            role = ROLE_MAPPING['developer']
-          end
-          Member.create(:user => u, :project => @target_project, :roles => [role])
-          u.reload
         end
         u
       end
@@ -435,6 +417,7 @@ namespace :redmine do
         #Wiki system initializing...
         @target_project.wiki.destroy if @target_project.wiki
         @target_project.issues.destroy_all
+        @target_project.members.destroy_all
         @target_project.reload
         wiki = Wiki.new(:project => @target_project, :start_page => 'WikiStart')
         wiki_edit_count = 0
@@ -536,7 +519,7 @@ namespace :redmine do
 
           # Owner
           unless ticket.owner.blank?
-            i.assigned_to = find_or_create_user(ticket.owner, true)
+            i.assigned_to = find_or_create_user(ticket.owner)
             Time.fake(ticket.changetime) { i.save }
           end
 
@@ -627,7 +610,7 @@ namespace :redmine do
           STDOUT.flush
           issue.description = convert_wiki_text(issue.description)
           issue.journals.each do |journal|
-            print ':'
+            print '.'
             STDOUT.flush
             journal.notes = convert_wiki_text(journal.notes)
             journal.save
@@ -635,6 +618,34 @@ namespace :redmine do
           Time.fake(issue.updated_on) { issue.save }
         end
         puts
+
+        # Give user permissions
+        print "Setting up permissions"
+        {
+          :edit_wiki_pages => wiki.pages.all.collect { |p| [p.content.author, p.content.versions.collect { |v| v.author }] },
+          :add_issues => @target_project.issues.all.collect { |i| i.author },
+          :edit_issues => @target_project.issues.all.collect { |i| i.assigned_to },
+          :add_issue_notes => @target_project.issues.all.collect { |i| i.journals.collect { |j| j.user } },
+        }.each do |perm, users|
+
+          users.flatten!
+          users.uniq!
+          users.reject! { |u| !u || u.status != 1 }
+          next unless users.length
+
+          role = Role.find(:first, :conditions => [ 'permissions LIKE ? AND builtin = 0', "%:#{perm}%" ], :order => 'position DESC') or next
+
+          print "\nAdding role #{role.to_s} for users #{users.join(' ')}"
+
+          users.each do |user|
+            member = Member.find(:first, :conditions => { :user_id => user, :project_id => @target_project }) || Member.create(:user => user, :project => @target_project)
+            next if member.roles.include?(role)
+            print "\n\tAdding role to #{user}"
+            member.roles << role
+            member.save
+          end
+
+        end
 
         puts
         puts "Components:      #{migrated_components}/#{TracComponent.count}"
