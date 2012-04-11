@@ -672,12 +672,11 @@ namespace :redmine do
 
           role = Role.find(:first, :conditions => [ 'permissions LIKE ? AND builtin = 0', "%:#{perm}%" ], :order => 'position DESC') or next
 
-          print "\nAdding role #{role.to_s} for users #{users.join(' ')}"
-
           users.each do |user|
             member = Member.find(:first, :conditions => { :user_id => user, :project_id => @target_project }) || Member.create(:user => user, :project => @target_project)
             next if member.roles.include?(role)
-            print "\n\tAdding role to #{user}"
+            print '.'
+            STDOUT.flush
             member.roles << role
             member.save
           end
