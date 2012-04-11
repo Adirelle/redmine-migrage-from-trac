@@ -603,6 +603,40 @@ namespace :redmine do
         end
         puts
 
+        committers = []
+        svn_dir = "/var/lib/svn/#{@target_project.identifier}"
+        if File.exist?(svn_dir)
+
+          # Remove existing repository from database
+          @target_project.repository.destroy if @target_project.repository
+
+          # Enable the repository module
+          @target_project.enable_module! :repository
+
+          # Recreate a subversion repository
+          print "Adding repository #{svn_dir}"
+          STDOUT.flush
+          rep = @target_project.repository = Repository.factory(:Subversion,
+                               :project => @target_project,
+                               :url => "file://"+svn_dir,
+                               :root_url => "file://"+svn_dir
+                              )
+          rep.save
+
+          # Fetch the change
+          rep.fetch_changesets
+
+          # Ouput latest revision number
+          puts ", latest revision: "+rep.latest_changeset.revision.to_s
+
+          rep.committers.each do |login, id|
+            user = id ? User.find_by_id(id) : rep.find_committer_user(login)
+            committers << user if user
+          end
+
+          @target_project.reload
+        end
+
         # Converting wiki texts
         print "Converting remaining wiki texts"
         @target_project.issues.each do |issue|
@@ -626,7 +660,10 @@ namespace :redmine do
           :add_issues => @target_project.issues.all.collect { |i| i.author },
           :edit_issues => @target_project.issues.all.collect { |i| i.assigned_to },
           :add_issue_notes => @target_project.issues.all.collect { |i| i.journals.collect { |j| j.user } },
+          :commit_access => committers,
         }.each do |perm, users|
+
+          next unless users
 
           users.flatten!
           users.uniq!
