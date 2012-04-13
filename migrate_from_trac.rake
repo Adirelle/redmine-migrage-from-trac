@@ -508,21 +508,16 @@ namespace :redmine do
                           :description => ticket.description,
                           :priority => PRIORITY_MAPPING[ticket.priority] || DEFAULT_PRIORITY,
                           :created_on => ticket.time
-          i.author = find_or_create_user(ticket.reporter)
+          i.author = find_or_create_user(ticket.reporter) unless ticket.reporter.blank? || USER_BLACKLIST.include?(ticket.reporter)
           i.category = issues_category_map[ticket.component] unless ticket.component.blank?
           i.fixed_version = version_map[ticket.milestone] unless ticket.milestone.blank?
           i.status = STATUS_MAPPING[ticket.status] || DEFAULT_STATUS
           i.tracker = TRACKER_MAPPING[ticket.ticket_type] || DEFAULT_TRACKER
           i.id = ticket.id unless Issue.exists?(ticket.id)
+          i.assigned_to = find_or_create_user(ticket.owner) unless ticket.owner.blank? || USER_BLACKLIST.include?(ticket.owner)
           next unless Time.fake(ticket.changetime) { i.save }
           TICKET_MAP[ticket.id] = i.id
           migrated_tickets += 1
-
-          # Owner
-          unless ticket.owner.blank?
-            i.assigned_to = find_or_create_user(ticket.owner)
-            Time.fake(ticket.changetime) { i.save }
-          end
 
           # Comments and status/resolution changes
           ticket.changes.group_by(&:time).each do |time, changeset|
