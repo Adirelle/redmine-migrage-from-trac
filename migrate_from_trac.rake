@@ -285,19 +285,17 @@ namespace :redmine do
 
         # External Links
         #      [http://example.com/]
-        text = text.gsub(/\[((?:https?|s?ftp):\S+?)\]/, '\1')
+        text = text.gsub(/\[((?:https?|s?ftp):\S+?)\]/) {|s| protect links, $1 }
         #      [http://example.com/ Example] [http://example.com/ "Example"]
-        text = text.gsub(/\[((?:https?|s?ftp):\S+)\s+(['"]?)(.+?)\2\]/, '"$3":\1')
+        text = text.gsub(/\[((?:https?|s?ftp):\S+)\s+(['"]?)(.+?)\2\]/) {|s| protect links, "\"#{$3}\":#{$1}" }
         #      [mailto:some@example.com] [mailto:"some@example.com"]
         text = text.gsub(/\[mailto:(['"]?)(\S+?)\1\]/, '\2')
         # Attachments links
-        text = text.gsub(/(attachment|source):(wiki|milestone|ticket):[^:]+:(\S+?)/, '\1:\3')
-        text = text.gsub(/\[(attachment|source):(\S+)\s+(.*?)\]/) {|s| "#{$3}: #{$1}:#{sanitize_attachment_filename($2)}"}
-        text = text.gsub(/\[(attachment|source):(.+?)\]/) {|s| "#{$1}:#{sanitize_attachment_filename($2)}"}
-        text = text.gsub(/(attachment|source):(\S+)/) {|s| "${$1}:#{sanitize_attachment_filename($1)}"}
+        text = text.gsub(/\[(attachment|source):(\S+)\s+(.*?)\]/) {|s| "#{protect links, $3}: #{$1}:#{$2}" } # Do not perform sanitization here
+        text = text.gsub(/(attachment|source):(?:(?:wiki|milestone|ticket):[^:]+:)?(\S+?)/) {|s| protect links, "#{$1}:#{sanitize_attachment_filename($2)}" }
         # Ticket links:
         #      [ticket:234 Text],[ticket:234 This is a test]
-        text = text.gsub(/\[ticket:(\d+)\s+(.+?)\]/) {|s| "\"#{$2}\":/issues/show/#{TICKET_MAP[$1.to_i] || $1}"}
+        text = text.gsub(/\[ticket:(\d+)\s+(.+?)\]/) {|s| protect links, "\"#{$2}\":/issues/show/#{TICKET_MAP[$1.to_i] || $1}" }
         #      ticket:1234
         #      #1 is working cause Redmine uses the same syntax.
         text = text.gsub(/ticket:(\d+)/, '#\1')
@@ -320,7 +318,7 @@ namespace :redmine do
         #      [wiki:"Some page"]
         text = text.gsub(/\[wiki:(['"])(.+?)\1\]/) {|s| "[[#{Wiki.titleize($2)}]]"}
         #      [wiki:SomePage Some text]
-        text = text.gsub(/\[wiki:(\w+)\s+(.+?)\]/) {|s| "[[#{Wiki.titleize($1)}|#{$2}]]"}
+        text = text.gsub(/\[wiki:(\S+)\s+(.+?)\]/) {|s| "[[#{Wiki.titleize($1)}|#{$2}]]"}
         #      [CamelCase Some text]
         text = text.gsub(/\[([[:upper:]][[:lower:]]+[[:upper:]][[:alpha:]]+)\s+(.+?)\]/) {|s| "[[#{Wiki.titleize($1)}|#{$2}]]"}
         #      wiki:CamelCase
