@@ -259,10 +259,19 @@ namespace :redmine do
         u
       end
 
+      def self.protect(hash, str)
+        key = "###PROTECTED-%08X###" % str.hash
+        hash[key] = str
+        key
+      end
+
       # Basic wiki syntax conversion
       def self.convert_wiki_text(text)
         # Encode it
         text = encode(text)
+
+        # Protected links
+        links = {}
 
         # Protect code blocks
         code_blocks = []
@@ -318,12 +327,10 @@ namespace :redmine do
         text = text.gsub(/wiki:([A-Z][a-z]+[A-Z][a-zA-Z]+)/, '[[\1]]')
 
         # Protect already converted links
-        links = []
-        text = text.gsub(/\[\[.+?\]\]/) { |s| links << s; '###LINK###' }
+        text = text.gsub(/\[\[.+?\]\]/) { |s| protect links, s }
 
         # Protect !NotALink strings
-        not_a_links = []
-        text = text.gsub(/!([A-Z][A-Za-z]+)/) { |s| not_a_links << $1; '###NOTALINK###' }
+        text = text.gsub(/!([A-Z][A-Za-z]+)/) { |s| protect links, $1 }
 
         # CamelCase Links
         text = text.gsub(/\b([A-Z][a-z]+[A-Z][a-zA-Z]+)\b/, '[[\1]]')
@@ -341,8 +348,7 @@ namespace :redmine do
         text = text.gsub(/\|\|/, '|')
 
         # Restore protected strings
-        text = text.gsub('###LINK###') { |s| links.shift }
-        text = text.gsub('###NOTALINK###') { |s| not_a_links.shift }
+        text = text.gsub(/###PROTECTED-[0-9A-F]+###/) {|s| links[s] || s}
 
         # Images
         text = text.gsub(/\[\[image\((.+?)(?:,.+?)?\)\]\]/i, '!\1!')
