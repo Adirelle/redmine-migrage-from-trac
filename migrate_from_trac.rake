@@ -385,9 +385,7 @@ namespace :redmine do
       def self.migrate_attachments(tracContainer, container)
         count = 0
         tracContainer.attachments.each do |attachment|
-          next if attachment.nil?
-          mangled_filename = sanitize_attachment_filename(attachment.filename)
-          next if container.attachments.find_by_filename(mangled_filename)
+          next if attachment.nil? || container.attachments.find_by_filename(attachment.filename)
           attachment.open {
             a = Attachment.new :created_on => attachment.time
             a.file = attachment
