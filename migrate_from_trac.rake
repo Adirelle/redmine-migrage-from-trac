@@ -575,11 +575,11 @@ namespace :redmine do
           TracWikiPage.all(:select => 'name, MAX(version) AS version',
                            :conditions => [ 'name NOT IN (?)', TRAC_WIKI_PAGES ], # Do not migrate Trac manul wiki pages
                            :group => 'name').each do |page|
-            print '.'
-            STDOUT.flush
-            wiki_edit_count += 1
             p = wiki.find_or_new_page(page.name)
             TracWikiPage.all(:conditions => [ 'name = ?', page.name ], :order => 'version').each do |rev|
+              print '.'
+              STDOUT.flush
+              wiki_edit_count += 1
               p.content = WikiContent.new(:page => p) if p.new_record?
               p.content.text = rev.text
               p.content.author = find_or_create_user(rev.author) unless rev.author.blank? || rev.author == 'trac'
