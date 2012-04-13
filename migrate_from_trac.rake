@@ -265,6 +265,30 @@ namespace :redmine do
         key
       end
 
+      def self.quote(str, what=/\s/)
+        str.match(what) ? '"'+str+'"' : str
+      end
+
+      def self.convert_link(link, scheme, ref, title=nil)
+        ref.strip! if ref
+        title.strip! if title
+        case scheme
+        when 'http', 'https', 'ftp', 'sftp', 'mailto'
+          (title ? '"' + title + '":' : '') + scheme + ':' + ref
+        when 'source', 'attachment'
+          ref.gsub!(/^((wiki|ticket):)?\w+:/, '')
+          "#{scheme}:#{quote(ref)}"
+        when 'changeset'
+          'r%d' % ref.to_i
+        when 'ticket'
+          '#%d' % (TICKET_MAP[ref.to_i] || ref)
+        when 'milestone'
+          'version:' + quote(ref)
+        else
+          '[[' + Wiki.titleize(ref) + (title ? ('|' + quote(title, /\]/)) : '') + ']]'
+        end
+      end
+
       # Basic wiki syntax conversion
       def self.convert_wiki_text(text)
         # Encode it
@@ -280,64 +304,41 @@ namespace :redmine do
         # Titles
         text = text.gsub(/^\s*(=+)\s(.+)\s(\=+)/) {|s| "\nh#{$1.length}. #{$2}\n"}
 
-        # [br] This has to go before the rules below
+        # [[br]] This has to go before the rules below
         text = text.gsub(/\[\[BR\]\]/i, "\n")
 
-        # External Links
-        #      [http://example.com/]
-        text = text.gsub(/\[((?:https?|s?ftp):\S+?)\]/) {|s| protect links, $1 }
-        #      [http://example.com/ Example] [http://example.com/ "Example"]
-        text = text.gsub(/\[((?:https?|s?ftp):\S+)\s+(['"]?)(.+?)\2\]/) {|s| protect links, "\"#{$3}\":#{$1}" }
-        #      [mailto:some@example.com] [mailto:"some@example.com"]
-        text = text.gsub(/\[mailto:(['"]?)(\S+?)\1\]/, '\2')
-        # Attachments links
-        text = text.gsub(/\[(attachment|source):(\S+)\s+(.*?)\]/) {|s| "#{protect links, $3}: #{$1}:#{$2}" } # Do not perform sanitization here
-        text = text.gsub(/(attachment|source):(?:(?:wiki|milestone|ticket):[^:]+:)?(\S+?)/) {|s| protect links, "#{$1}:#{sanitize_attachment_filename($2)}" }
-        # Ticket links:
-        #      [ticket:234 Text],[ticket:234 This is a test]
-        text = text.gsub(/\[ticket:(\d+)\s+(.+?)\]/) {|s| protect links, "\"#{$2}\":/issues/show/#{TICKET_MAP[$1.to_i] || $1}" }
-        #      ticket:1234
-        #      #1 is working cause Redmine uses the same syntax.
-        text = text.gsub(/ticket:(\d+)/, '#\1')
-        # Milestone links:
-        #      [milestone:"0.1.0 Mercury" Milestone 0.1.0 (Mercury)]
-        #      The text "Milestone 0.1.0 (Mercury)" is not converted,
-        #      cause Redmine's wiki does not support this.
-        text = text.gsub(/\[milestone:(['"]?)(.+?)\1\s+(.+?)\]/, 'version:"\2"')
-        #      [milestone:"0.1.0 Mercury"]
-        text = text.gsub(/\[milestone:(['"]?)(.+?)\1\]/, 'version:"\2"')
-        #      [milestone:0.1.0]
-        text = text.gsub(/\[milestone:(\S+)\]/, 'version:\1')
-        #      milestone:"0.1.0 Mercury"
-        text = text.gsub(/milestone:(['"]?)(.+?)\1/, 'version:"\2"')
-        #      milestone:0.1.0
-        text = text.gsub(/milestone:(\S+)/, 'version:\1')
-        # Internal Links
-        #      ["Some page"]
-        text = text.gsub(/\[(['"])(.+)\1\]/) {|s| "[[#{Wiki.titleize($2)}]]"}
-        #      [wiki:"Some page"]
-        text = text.gsub(/\[wiki:(['"])(.+?)\1\]/) {|s| "[[#{Wiki.titleize($2)}]]"}
-        #      [wiki:SomePage Some text]
-        text = text.gsub(/\[wiki:(\S+)\s+(.+?)\]/) {|s| "[[#{Wiki.titleize($1)}|#{$2}]]"}
-        #      [CamelCase Some text]
-        text = text.gsub(/\[([[:upper:]][[:lower:]]+[[:upper:]][[:alpha:]]+)\s+(.+?)\]/) {|s| "[[#{Wiki.titleize($1)}|#{$2}]]"}
-        #      wiki:CamelCase
-        text = text.gsub(/wiki:([[:upper:]][[:lower:]]+[[:upper:]][[:alpha:]]+)/, '[[\1]]')
+        # Changesets like [15]
+        text = text.gsub(/\[(\d+)\]/) {|s| protect links, "#{$1}"}
 
-        # Protect already converted links
-        text = text.gsub(/\[\[.+?\]\]/) { |s| protect links, s }
+        # Images
+        text = text.gsub(/\[\[image\((.+?)(?:,.+?)?\)\]\]/i) {|s| protect links, "!#{$1}!"}
 
-        # Protect !NotALink strings
-        text = text.gsub(/!([A-Z][A-Za-z]+)/) { |s| protect links, $1 }
+        # TOC
+        text = text.gsub(/\[\[TOC(?:\((.*?)\))?\]\]/m) {|s| protect links, "{{>toc}}\n"}
+
+        # Wiki links with brackets
+        text = text.gsub(/\[
+                           # Scheme
+                           (?:(https?|s?ftp|mailto|wiki|attachment|source|changeset|ticket|milestone):)?
+                           # Reference
+                           (?:(['"])(.*?)\2|(\S+))
+                           # Title
+                           (?:\s(?:(['"])(.*?)\5|(.*?)))?
+                         \]/x) {|s| protect(links, convert_link(s, $1, $3 || $4, $6 || $7)) }
+
+        # !NotALink strings
+        text = text.gsub(/\!\S+/) { |s| protect links, s }
+
+        # Wiki links without brackets
+        text = text.gsub(/
+                           # Scheme
+                           (https?|s?ftp|mailto|wiki|attachment|source|changeset|ticket|milestone):
+                           # Reference
+                           (?:(['"])(.*?)\2|(\S+))
+                         /x) {|s| protect(links, convert_link(s, $1, $3 || $4)) }
 
         # CamelCase Links
-        text = text.gsub(/\b([A-Z][a-z]+[A-Z][a-zA-Z]+)\b/, '[[\1]]')
-
-        # Revisions links
-        #      [15]
-        text = text.gsub(/\[(\d+)\]/, 'r\1')
-        #      changeset:15
-        text = text.gsub(/changeset:(\d+)/, 'r\1')
+        text = text.gsub(/\b([[:upper:]][[:lower:]]+[[:upper:]][[:alpha:]]+)\b/, '[[\1]]')
 
         # Ticket number re-writing
         text = text.gsub(/\#(\d{1,9})/) { |s| "\##{TICKET_MAP[$1.to_i] || $1}" }
@@ -348,10 +349,6 @@ namespace :redmine do
         # Restore protected strings
         text = text.gsub(/###PROTECTED-[0-9A-F]+###/) {|s| links[s] || s}
 
-        # Images
-        text = text.gsub(/\[\[image\((.+?)(?:,.+?)?\)\]\]/i, '!\1!')
-        # TOC
-        text = text.gsub(/\[\[TOC(?:\((.*?)\))?\]\]/m) {|s| "{{>toc}}\n"}
         # Lists
         #      bullets
         text = text.gsub(/^([ \t]+)\*[ \t+]/m) {|s| '*' * $1.length + " " }
