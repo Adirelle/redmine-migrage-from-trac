@@ -413,11 +413,21 @@ namespace :redmine do
         migrated_wiki_edits = 0
         migrated_wiki_attachments = 0
 
+        if @target_project.issues.first
+          puts "Deleting existing issues"
+          @target_project.issues.destroy_all
+        end
+
+        if @target_project.members.first
+          puts "Removing existing members"
+          @target_project.members.destroy_all
+        end
+
         #Wiki system initializing...
+        puts "Deleting existing wiki pages"
         @target_project.wiki.destroy if @target_project.wiki
-        @target_project.issues.destroy_all
-        @target_project.members.destroy_all
         @target_project.reload
+
         wiki = Wiki.new(:project => @target_project, :start_page => 'WikiStart')
         wiki_edit_count = 0
 
@@ -602,14 +612,16 @@ namespace :redmine do
         if File.exist?(svn_dir)
 
           # Remove existing repository from database
-          @target_project.repository.destroy if @target_project.repository
+          if @target_project.repository
+            puts "Removing existing repository"
+            @target_project.repository.destroy
+          end
 
           # Enable the repository module
           @target_project.enable_module! :repository
 
           # Recreate a subversion repository
-          print "Adding repository #{svn_dir}"
-          STDOUT.flush
+          puts "Adding repository #{svn_dir}"
           rep = @target_project.repository = Repository.factory(:Subversion,
                                :project => @target_project,
                                :url => "file://"+svn_dir,
@@ -618,11 +630,13 @@ namespace :redmine do
           rep.save
 
           # Fetch the change
+          print "Fetching all revisions: "
+          STDOUT.flush
           rep.fetch_changesets
 
-          # Ouput latest revision number
-          puts ", latest revision: "+rep.latest_changeset.revision.to_s
+          puts rep.latest_changeset.revision
 
+          puts "Collecting commiters"
           rep.committers.each do |login, id|
             user = id ? User.find_by_id(id) : rep.find_committer_user(login)
             committers << user if user
