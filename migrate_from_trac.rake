@@ -277,7 +277,7 @@ namespace :redmine do
           (title ? '"' + title + '":' : '') + scheme + ':' + ref
         when 'source', 'attachment'
           ref.gsub!(/^((wiki|ticket):)?\w+:/, '')
-          "#{scheme}:#{quote(ref)}"
+          title ? "#{title} (#{scheme}:#{quote(ref)})" : "#{scheme}:#{quote(ref)}"
         when 'changeset'
           'r%d' % ref.to_i
         when 'ticket'
