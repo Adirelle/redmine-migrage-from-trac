@@ -459,7 +459,7 @@ namespace :redmine do
           next unless v.save
           version_map[milestone.name] = v
           migrated_milestones += 1
-          migrated_milestone_attachments += migrate_attachments(milestone, v)
+          migrated_milestone_attachments += migrate_attachments(milestone, p)
         end
         puts
 
