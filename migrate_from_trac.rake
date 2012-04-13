@@ -322,9 +322,9 @@ namespace :redmine do
         #      [wiki:SomePage Some text]
         text = text.gsub(/\[wiki:(\w+)\s+(.+?)\]/) {|s| "[[#{Wiki.titleize($1)}|#{$2}]]"}
         #      [CamelCase Some text]
-        text = text.gsub(/\[([A-Z][a-z]+[A-Z][a-zA-Z]+)\s+(.+?)\]/) {|s| "[[#{Wiki.titleize($1)}|#{$2}]]"}
+        text = text.gsub(/\[([[:upper:]][[:lower:]]+[[:upper:]][[:alpha:]]+)\s+(.+?)\]/) {|s| "[[#{Wiki.titleize($1)}|#{$2}]]"}
         #      wiki:CamelCase
-        text = text.gsub(/wiki:([A-Z][a-z]+[A-Z][a-zA-Z]+)/, '[[\1]]')
+        text = text.gsub(/wiki:([[:upper:]][[:lower:]]+[[:upper:]][[:alpha:]]+)/, '[[\1]]')
 
         # Protect already converted links
         text = text.gsub(/\[\[.+?\]\]/) { |s| protect links, s }
