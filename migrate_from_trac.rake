@@ -635,7 +635,8 @@ namespace :redmine do
           STDOUT.flush
           rep.fetch_changesets
 
-          puts rep.latest_changeset.revision
+          latest = rep.latest_changeset
+          puts latest ? latest.revision : '-'
 
           puts "Collecting commiters"
           rep.committers.each do |login, id|
