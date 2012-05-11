@@ -613,9 +613,9 @@ namespace :redmine do
         if File.exist?(svn_dir)
 
           # Remove existing repository from database
-          if @target_project.repository
-            puts "Removing existing repository"
-            @target_project.repository.destroy
+          if @target_project.repositories
+            puts "Removing existing repositories"
+            @target_project.repositories.destroy_all
           end
 
           # Enable the repository module
@@ -623,11 +623,13 @@ namespace :redmine do
 
           # Recreate a subversion repository
           puts "Adding repository #{svn_dir}"
-          rep = @target_project.repository = Repository.factory(:Subversion,
+          rep = Repository.factory(:Subversion,
                                :project => @target_project,
                                :url => "file://"+svn_dir,
-                               :root_url => "file://"+svn_dir
+                               :root_url => "file://"+svn_dir,
+                               :is_default => true
                               )
+          @target_project.repositories << rep
           rep.save
 
           # Fetch the change
