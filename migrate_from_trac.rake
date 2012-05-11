@@ -460,6 +460,8 @@ namespace :redmine do
           p.content.comments = 'Milestone'
           p.save
 
+          migrated_milestone_attachments += migrate_attachments(milestone, p)
+
           v = Version.new :project => @target_project,
                           :name => encode(milestone.name[0, limit_for(Version, 'name')]),
                           :description => nil,
@@ -469,7 +471,6 @@ namespace :redmine do
           next unless v.save
           version_map[milestone.name] = v
           migrated_milestones += 1
-          migrated_milestone_attachments += migrate_attachments(milestone, p)
         end
         puts
 
