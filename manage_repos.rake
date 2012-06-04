@@ -50,20 +50,18 @@ namespace :redmine do
         url = repo.url
         path = adapter.path_from_url(url) or next
 
-        # Check if the repository is a directory
+        # Ignore non-standard paths
+        unless path == File.join(adapter::ROOT, identifier)
+          puts "#{identifier}: ignoring repository with non-standard path: #{path}, should be: #{File.join(adapter::ROOT, identifier)}"
+          next
+        end
+
+        # Create the repository if need be
         unless File.exists?(path) && File.directory?(path)
-          # It does not, check if the path matchs the standard path scheme
-          if path == File.join(adapter::ROOT, identifier)
-            # Yes: create it
-            if system "#{adapter::CREATE_COMMAND} #{path}" then
-              puts "#{identifier}: created #{repo.scm_name} repository in #{path}"
-            else
-              puts "#{identifier}: failed to create repository"
-              next
-            end
+          if system "#{adapter::CREATE_COMMAND} #{path}" then
+            puts "#{identifier}: created #{repo.scm_name} repository in #{path}"
           else
-            # No: next !
-            puts "#{identifier}: repository #{path} does not exist or is not a directory, and is not located in the repository root"
+            puts "#{identifier}: failed to create repository"
             next
           end
         end
