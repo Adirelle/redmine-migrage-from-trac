@@ -37,7 +37,7 @@ namespace :redmine do
       project.repositories.each do |repo|
 
         # Fetch identifier
-        identifier = repo.identifier || (repo.is_default? && project.identifier) or next
+        identifier = (repo.is_default? ? project.identifier : repo.identifier) or next
 
         # Ignore repositories with unhandled SCMs
         begin
@@ -48,16 +48,13 @@ namespace :redmine do
         end
 
         url = repo.url
+        path = adapter.path_from_url(url) or next
 
-        if url.strip.upcase == 'AUTO'
-          # We should create a local repository
-
-          # Define path and URL
-          path = adapter::ROOT + '/' + project.identifier
-          url = adapter.url_from_path(path)
-
-          # Create the repository unless it exists
-          unless File.exists?(path)
+        # Check if the repository is a directory
+        unless File.exists?(path) && File.directory?(path)
+          # It does not, check if the path matchs the standard path scheme
+          if path == File.join(adapter::ROOT, identifier)
+            # Yes: create it
             if system "#{adapter::CREATE_COMMAND} #{path}" then
               puts "#{identifier}: created #{repo.scm_name} repository in #{path}"
             else
@@ -65,22 +62,10 @@ namespace :redmine do
               next
             end
           else
-            puts "#{identifier}: using existing repository in #{path}"
+            # No: next !
+            puts "#{identifier}: repository #{path} does not exist or is not a directory, and is not located in the repository root"
+            next
           end
-
-          # Update the repository data
-          repo.url = url
-          repo.save and puts "#{identifier}: repository URL set to #{url}"
-
-        else
-          # Checking defined repository, if it is local
-          path = adapter.path_from_url(url) or next
-        end
-
-        # Check the repository is a directory
-        unless File.exists?(path) && File.directory?(path)
-          puts "#{identifier}: repository #{path} does not exist or is not a directory"
-          next
         end
 
         # Check ownership and permissions
