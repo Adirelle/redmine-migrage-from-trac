@@ -37,7 +37,7 @@ namespace :redmine do
       project.repositories.each do |repo|
 
         # Fetch identifier
-        identifier = (repo.is_default? ? project.identifier : repo.identifier) or next
+        identifier = repo.identifier || (repo.is_default? && project.identifier) or next
 
         # Ignore repositories with unhandled SCMs
         begin
